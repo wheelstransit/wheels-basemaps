@@ -1,0 +1,411 @@
+name: Build Hong Kong Basemap and Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch: # Allow manual triggering
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-tiles:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Java 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        
+    - name: Cache Maven dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+        
+    - name: Build JAR with Maven
+      run: |
+        cd tiles
+        mvn clean package -DskipTests
+        
+    - name: Create output directory
+      run: mkdir -p dist
+      
+    - name: Generate Hong Kong basemap tiles
+      run: |
+        cd tiles
+        java -Xmx4g -jar target/*-with-deps.jar \
+          --download \
+          --force \
+          --area=hong-kong \
+          --output=../dist/hong-kong.pmtiles
+          
+    - name: Verify PMTiles file was created
+      run: |
+        ls -la dist/
+        if [ ! -f "dist/hong-kong.pmtiles" ]; then
+          echo "Error: hong-kong.pmtiles was not created"
+          exit 1
+        fi
+        echo "PMTiles file size: $(du -h dist/hong-kong.pmtiles)"
+        
+    - name: Build web styles
+      run: |
+        cd styles
+        npm ci
+        npm run build
+        
+    - name: Create web interface
+      run: |
+        cat > dist/index.html << 'EOF'
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Hong Kong Basemap</title>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <script src="https://unpkg.com/maplibre-gl@4.0.0/dist/maplibre-gl.js"></script>
+            <link href="https://unpkg.com/maplibre-gl@4.0.0/dist/maplibre-gl.css" rel="stylesheet">
+            <script src="https://unpkg.com/pmtiles@3.0.6/dist/pmtiles.js"></script>
+            <style>
+                body { margin: 0; padding: 0; }
+                #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+                .info-panel {
+                    position: absolute;
+                    top: 10px;
+                    left: 10px;
+                    background: rgba(255, 255, 255, 0.9);
+                    padding: 15px;
+                    border-radius: 5px;
+                    font-family: Arial, sans-serif;
+                    font-size: 14px;
+                    max-width: 300px;
+                    z-index: 1000;
+                }
+                .controls {
+                    position: absolute;
+                    top: 10px;
+                    right: 10px;
+                    z-index: 1000;
+                }
+                .theme-button {
+                    background: rgba(255, 255, 255, 0.9);
+                    border: 1px solid #ccc;
+                    padding: 8px 12px;
+                    margin: 2px;
+                    border-radius: 3px;
+                    cursor: pointer;
+                    font-size: 12px;
+                }
+                .theme-button:hover {
+                    background: rgba(255, 255, 255, 1);
+                }
+                .theme-button.active {
+                    background: #007cba;
+                    color: white;
+                }
+            </style>
+        </head>
+        <body>
+            <div id="map"></div>
+            
+            <div class="info-panel">
+                <h3>🇭🇰 Hong Kong Basemap</h3>
+                <p><strong>Features included:</strong></p>
+                <ul>
+                    <li>🌳 Individual trees (natural=tree)</li>
+                    <li>🚶‍♂️ Pedestrian crossings (highway=crossing)</li>
+                    <li>🌲 Wood areas (natural=wood)</li>
+                    <li>🏞️ Gardens (leisure=garden)</li>
+                    <li>📍 All standard basemap features</li>
+                </ul>
+                <p><small>Built automatically from latest commit<br>
+                Generated: <span id="build-time"></span></small></p>
+            </div>
+            
+            <div class="controls">
+                <button class="theme-button active" onclick="setTheme('light')">Light</button>
+                <button class="theme-button" onclick="setTheme('dark')">Dark</button>
+                <button class="theme-button" onclick="setTheme('white')">White</button>
+                <button class="theme-button" onclick="setTheme('grayscale')">Grayscale</button>
+                <button class="theme-button" onclick="setTheme('black')">Black</button>
+            </div>
+
+            <script>
+                // Set build time
+                document.getElementById('build-time').textContent = new Date().toLocaleString();
+                
+                // Add PMTiles protocol
+                let protocol = new pmtiles.Protocol();
+                maplibregl.addProtocol("pmtiles", protocol.tile);
+
+                // Hong Kong center coordinates
+                const hongKongCenter = [114.1694, 22.3193];
+                
+                // Initialize map
+                let map = new maplibregl.Map({
+                    container: 'map',
+                    center: hongKongCenter,
+                    zoom: 11,
+                    maxZoom: 20
+                });
+
+                // Current theme
+                let currentTheme = 'light';
+                
+                // Base style template
+                const getStyle = (theme) => ({
+                    version: 8,
+                    sources: {
+                        "hong-kong": {
+                            type: "vector",
+                            url: "pmtiles://./hong-kong.pmtiles"
+                        }
+                    },
+                    layers: [
+                        // Background
+                        {
+                            id: "background",
+                            type: "background",
+                            paint: {
+                                "background-color": theme === 'dark' || theme === 'black' ? "#1a1a1a" : 
+                                                   theme === 'white' ? "#ffffff" : 
+                                                   theme === 'grayscale' ? "#f5f5f5" : "#f8f8f8"
+                            }
+                        },
+                        // Water
+                        {
+                            id: "water",
+                            type: "fill",
+                            source: "hong-kong",
+                            "source-layer": "water",
+                            paint: {
+                                "fill-color": theme === 'dark' ? "#2d3748" : 
+                                             theme === 'black' ? "#000000" :
+                                             theme === 'white' ? "#e2e8f0" :
+                                             theme === 'grayscale' ? "#e0e0e0" : "#a0c4ff"
+                            }
+                        },
+                        // Landuse - Parks and green spaces
+                        {
+                            id: "landuse-park",
+                            type: "fill",
+                            source: "hong-kong",
+                            "source-layer": "landuse",
+                            filter: ["in", "kind", "park", "garden", "wood", "forest", "nature_reserve", "golf_course"],
+                            paint: {
+                                "fill-color": theme === 'dark' ? "#2d5a2d" : 
+                                             theme === 'black' ? "#1a1a1a" :
+                                             theme === 'white' ? "#f0f0f0" :
+                                             theme === 'grayscale' ? "#e8e8e8" : "#c8e6c9",
+                                "fill-opacity": 0.6
+                            }
+                        },
+                        // Buildings
+                        {
+                            id: "buildings",
+                            type: "fill",
+                            source: "hong-kong",
+                            "source-layer": "buildings",
+                            minzoom: 14,
+                            paint: {
+                                "fill-color": theme === 'dark' ? "#374151" : 
+                                             theme === 'black' ? "#2a2a2a" :
+                                             theme === 'white' ? "#d1d5db" :
+                                             theme === 'grayscale' ? "#d0d0d0" : "#e5e7eb",
+                                "fill-opacity": 0.8
+                            }
+                        },
+                        // Roads
+                        {
+                            id: "roads",
+                            type: "line",
+                            source: "hong-kong",
+                            "source-layer": "roads",
+                            paint: {
+                                "line-color": theme === 'dark' ? "#4b5563" : 
+                                             theme === 'black' ? "#404040" :
+                                             theme === 'white' ? "#9ca3af" :
+                                             theme === 'grayscale' ? "#a0a0a0" : "#ffffff",
+                                "line-width": [
+                                    "interpolate", ["linear"], ["zoom"],
+                                    5, 0.5,
+                                    10, 1,
+                                    15, 2,
+                                    20, 4
+                                ]
+                            }
+                        },
+                        // Trees (new feature!)
+                        {
+                            id: "trees",
+                            type: "circle",
+                            source: "hong-kong",
+                            "source-layer": "pois",
+                            filter: ["==", "kind", "tree"],
+                            minzoom: 16,
+                            paint: {
+                                "circle-color": theme === 'dark' ? "#10b981" : 
+                                              theme === 'black' ? "#22c55e" :
+                                              theme === 'white' ? "#059669" :
+                                              theme === 'grayscale' ? "#6b7280" : "#16a085",
+                                "circle-radius": [
+                                    "interpolate", ["linear"], ["zoom"],
+                                    16, 2,
+                                    18, 4,
+                                    20, 6
+                                ],
+                                "circle-opacity": 0.8
+                            }
+                        },
+                        // Crossings (new feature!)
+                        {
+                            id: "crossings",
+                            type: "circle",
+                            source: "hong-kong",
+                            "source-layer": "transit",
+                            filter: ["==", "kind", "crossing"],
+                            minzoom: 16,
+                            paint: {
+                                "circle-color": theme === 'dark' ? "#fbbf24" : 
+                                              theme === 'black' ? "#f59e0b" :
+                                              theme === 'white' ? "#d97706" :
+                                              theme === 'grayscale' ? "#374151" : "#f39c12",
+                                "circle-radius": [
+                                    "interpolate", ["linear"], ["zoom"],
+                                    16, 3,
+                                    18, 5,
+                                    20, 7
+                                ],
+                                "circle-stroke-width": 1,
+                                "circle-stroke-color": theme === 'dark' || theme === 'black' ? "#ffffff" : "#000000"
+                            }
+                        },
+                        // Place labels
+                        {
+                            id: "place-labels",
+                            type: "symbol",
+                            source: "hong-kong",
+                            "source-layer": "places",
+                            layout: {
+                                "text-field": "{name}",
+                                "text-font": ["Open Sans Regular"],
+                                "text-size": [
+                                    "interpolate", ["linear"], ["zoom"],
+                                    10, 12,
+                                    15, 16
+                                ]
+                            },
+                            paint: {
+                                "text-color": theme === 'dark' || theme === 'black' ? "#ffffff" : 
+                                             theme === 'white' ? "#374151" :
+                                             theme === 'grayscale' ? "#1f2937" : "#2c3e50",
+                                "text-halo-color": theme === 'dark' || theme === 'black' ? "#000000" : "#ffffff",
+                                "text-halo-width": 1
+                            }
+                        }
+                    ]
+                });
+
+                // Set initial style
+                map.on('load', () => {
+                    map.setStyle(getStyle(currentTheme));
+                });
+                
+                // Theme switching function
+                function setTheme(theme) {
+                    currentTheme = theme;
+                    map.setStyle(getStyle(theme));
+                    
+                    // Update button states
+                    document.querySelectorAll('.theme-button').forEach(btn => {
+                        btn.classList.remove('active');
+                    });
+                    event.target.classList.add('active');
+                }
+                
+                // Add navigation controls
+                map.addControl(new maplibregl.NavigationControl());
+                
+                // Add scale control
+                map.addControl(new maplibregl.ScaleControl());
+                
+                // Add fullscreen control
+                map.addControl(new maplibregl.FullscreenControl());
+            </script>
+        </body>
+        </html>
+        EOF
+        
+    - name: Copy additional files
+      run: |
+        # Create a simple README for the deployment
+        cat > dist/README.md << 'EOF'
+        # Hong Kong Basemap
+        
+        This is an automatically generated basemap of Hong Kong using Protomaps.
+        
+        ## Features
+        - Individual trees (natural=tree) visible at zoom 16+
+        - Pedestrian crossings (highway=crossing) visible at zoom 16+
+        - Wood areas (natural=wood) 
+        - Gardens (leisure=garden)
+        - All standard OpenStreetMap features
+        
+        ## Themes
+        - Light (default)
+        - Dark
+        - White
+        - Grayscale  
+        - Black
+        
+        Built automatically from the latest commit using GitHub Actions.
+        EOF
+        
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: hong-kong-basemap
+        path: dist/
+
+  deploy:
+    needs: build-tiles
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+      
+    steps:
+    - name: Download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: hong-kong-basemap
+        path: dist/
+        
+    - name: Setup Pages
+      uses: actions/configure-pages@v4
+      
+    - name: Upload to GitHub Pages
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: dist/
+        
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4

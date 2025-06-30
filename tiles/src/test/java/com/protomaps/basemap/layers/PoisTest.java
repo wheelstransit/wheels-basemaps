@@ -78,4 +78,30 @@ class PoisTest extends LayerTest {
         0
       )));
   }
+
+  @Test
+  void tree() {
+    assertFeatures(15,
+      List.of(Map.of("kind", "tree", "min_zoom", 16)),
+      process(SimpleFeature.create(
+        newPoint(1, 1),
+        new HashMap<>(Map.of("natural", "tree")),
+        "osm",
+        null,
+        0
+      )));
+  }
+
+  @Test
+  void treeWithName() {
+    assertFeatures(15,
+      List.of(Map.of("kind", "tree", "min_zoom", 16, "name", "Heritage Oak")),
+      process(SimpleFeature.create(
+        newPoint(1, 1),
+        new HashMap<>(Map.of("natural", "tree", "name", "Heritage Oak")),
+        "osm",
+        null,
+        0
+      )));
+  }
 }

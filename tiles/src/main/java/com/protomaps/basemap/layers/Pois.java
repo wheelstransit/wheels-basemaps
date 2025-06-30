@@ -42,7 +42,7 @@ public class Pois implements ForwardingProfile.LayerPostProcessor {
       sf.hasTag("landuse", "cemetery", "recreation_ground", "winter_sports", "quarry", "park", "forest", "military",
         "village_green", "allotments") ||
       sf.hasTag("leisure") ||
-      sf.hasTag("natural", "beach", "peak") ||
+      sf.hasTag("natural", "beach", "peak", "tree") ||
       sf.hasTag("railway", "station") ||
       sf.hasTag("highway", "bus_stop") ||
       sf.hasTag("shop") ||
@@ -113,6 +113,9 @@ public class Pois implements ForwardingProfile.LayerPostProcessor {
       } else if (sf.hasTag("natural", "peak")) {
         kind = sf.getString("natural");
         minZoom = 13;
+      } else if (sf.hasTag("natural", "tree")) {
+        kind = sf.getString("natural");
+        minZoom = 15;
       } else {
         // Avoid problem of too many "other" kinds
         // All these will default to min_zoom of 15
