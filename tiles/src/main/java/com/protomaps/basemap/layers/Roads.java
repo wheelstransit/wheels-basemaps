@@ -184,6 +184,27 @@ public class Roads implements ForwardingProfile.LayerPostProcessor, ForwardingPr
       use("minZoomNames", 14)
     ),
     rule(
+      with("highway", "cycleway"),
+      use("kind", "cycleway"),
+      use("minZoom", 12),
+      use("minZoomShieldText", 12),
+      use("minZoomNames", 14)
+    ),
+    rule(
+      with("bicycle_road", "yes"),
+      use("kind", "bicycle_road"),
+      use("minZoom", 11),
+      use("minZoomShieldText", 12),
+      use("minZoomNames", 14)
+    ),
+    rule(
+      with("cyclestreet", "yes"),
+      use("kind", "bicycle_road"),
+      use("minZoom", 11),
+      use("minZoomShieldText", 12),
+      use("minZoomNames", 14)
+    ),
+    rule(
       with("highway", "corridor"),
       use("kind", "path"),
       use("kindDetail", fromTag("footway")),
@@ -400,10 +421,94 @@ public class Roads implements ForwardingProfile.LayerPostProcessor, ForwardingPr
       feat.setAttrWithMinzoom("is_tunnel", true, 12);
     }
 
+    // Add cycling infrastructure attributes
+    addCyclingAttributes(sf, feat);
+
     // Server sort features so client label collisions are pre-sorted
     feat.setSortKey(minZoom);
 
     OsmNames.setOsmNames(feat, sf, minZoomNames);
+  }
+
+  private void addCyclingAttributes(SourceFeature sf, FeatureCollector.Feature feat) {
+    // Bicycle access
+    if (sf.hasTag("bicycle")) {
+      feat.setAttrWithMinzoom("bicycle", sf.getString("bicycle"), 14);
+    }
+
+    // Cycleway infrastructure on both sides
+    if (sf.hasTag("cycleway")) {
+      feat.setAttrWithMinzoom("cycleway", sf.getString("cycleway"), 14);
+    }
+    if (sf.hasTag("cycleway:left")) {
+      feat.setAttrWithMinzoom("cycleway_left", sf.getString("cycleway:left"), 14);
+    }
+    if (sf.hasTag("cycleway:right")) {
+      feat.setAttrWithMinzoom("cycleway_right", sf.getString("cycleway:right"), 14);
+    }
+    if (sf.hasTag("cycleway:both")) {
+      feat.setAttrWithMinzoom("cycleway_both", sf.getString("cycleway:both"), 14);
+    }
+
+    // Bicycle road designation
+    if (sf.hasTag("bicycle_road", "yes")) {
+      feat.setAttrWithMinzoom("bicycle_road", true, 14);
+    }
+
+    // Cycle street designation
+    if (sf.hasTag("cyclestreet", "yes")) {
+      feat.setAttrWithMinzoom("cyclestreet", true, 14);
+    }
+
+    // Surface information important for cycling
+    if (sf.hasTag("surface")) {
+      feat.setAttrWithMinzoom("surface", sf.getString("surface"), 14);
+    }
+
+    // Smoothness information for cycling route quality
+    if (sf.hasTag("smoothness")) {
+      feat.setAttrWithMinzoom("smoothness", sf.getString("smoothness"), 14);
+    }
+
+    // Segregated cycleway information
+    if (sf.hasTag("segregated")) {
+      feat.setAttrWithMinzoom("segregated", sf.getString("segregated"), 14);
+    }
+
+    // Width information for cycleways
+    if (sf.hasTag("cycleway:width")) {
+      feat.setAttrWithMinzoom("cycleway_width", sf.getString("cycleway:width"), 14);
+    }
+    if (sf.hasTag("cycleway:left:width")) {
+      feat.setAttrWithMinzoom("cycleway_left_width", sf.getString("cycleway:left:width"), 14);
+    }
+    if (sf.hasTag("cycleway:right:width")) {
+      feat.setAttrWithMinzoom("cycleway_right_width", sf.getString("cycleway:right:width"), 14);
+    }
+
+    // Buffer/separation information
+    if (sf.hasTag("cycleway:buffer")) {
+      feat.setAttrWithMinzoom("cycleway_buffer", sf.getString("cycleway:buffer"), 14);
+    }
+    if (sf.hasTag("cycleway:left:buffer")) {
+      feat.setAttrWithMinzoom("cycleway_left_buffer", sf.getString("cycleway:left:buffer"), 14);
+    }
+    if (sf.hasTag("cycleway:right:buffer")) {
+      feat.setAttrWithMinzoom("cycleway_right_buffer", sf.getString("cycleway:right:buffer"), 14);
+    }
+
+    // Lane markings for bicycle lanes
+    if (sf.hasTag("cycleway:lane")) {
+      feat.setAttrWithMinzoom("cycleway_lane", sf.getString("cycleway:lane"), 14);
+    }
+
+    // Oneway cycling restrictions
+    if (sf.hasTag("cycleway:oneway")) {
+      feat.setAttrWithMinzoom("cycleway_oneway", sf.getString("cycleway:oneway"), 14);
+    }
+    if (sf.hasTag("oneway:bicycle")) {
+      feat.setAttrWithMinzoom("oneway_bicycle", sf.getString("oneway:bicycle"), 14);
+    }
   }
 
   private void processOsmNonHighways(SourceFeature sf, FeatureCollector features) {

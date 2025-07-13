@@ -250,7 +250,7 @@ jobs:
                                 ]
                             }
                         },
-                        // Trees (new feature!)
+                        // Trees (new feature!) - constant visual size across zooms
                         {
                             id: "trees",
                             type: "circle",
@@ -263,12 +263,7 @@ jobs:
                                               theme === 'black' ? "#22c55e" :
                                               theme === 'white' ? "#059669" :
                                               theme === 'grayscale' ? "#6b7280" : "#16a085",
-                                "circle-radius": [
-                                    "interpolate", ["linear"], ["zoom"],
-                                    16, 2,
-                                    18, 4,
-                                    20, 6
-                                ],
+                                "circle-radius": 4, // Fixed size - no zoom scaling
                                 "circle-opacity": 0.8
                             }
                         },

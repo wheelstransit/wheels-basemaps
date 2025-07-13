@@ -182,7 +182,7 @@ class RoadsTest extends LayerTest {
     "pedestrian, path, pedestrian, 12, 12",
     "track, path, track, 12, 12",
     "path, path, path, 13, 13",
-    "cycleway, path, cycleway, 13, 13",
+    "cycleway, cycleway, cycleway, 12, 12",
     "bridleway, path, bridleway, 13, 13",
     "footway, path, footway, 13, 13",
     "steps, path, steps, 13, 13",
@@ -464,6 +464,72 @@ class RoadsTest extends LayerTest {
         0, 0, 1, 1,
         "railway", "a",
         "service", service
+      )
+    );
+  }
+
+  @Test
+  void testBicycleRoad() {
+    assertFeatures(15,
+      List.of(Map.of("kind", "bicycle_road",
+        "_minzoom", 11,
+        "bicycle_road", true
+      )),
+      processWith("highway", "residential",
+        "bicycle_road", "yes"
+      )
+    );
+  }
+
+  @Test
+  void testCyclestreet() {
+    assertFeatures(15,
+      List.of(Map.of("kind", "bicycle_road",
+        "_minzoom", 11,
+        "cyclestreet", true
+      )),
+      processWith("highway", "residential",
+        "cyclestreet", "yes"
+      )
+    );
+  }
+
+  @Test
+  void testCyclewayAttributes() {
+    assertFeatures(15,
+      List.of(Map.of("kind", "cycleway",
+        "cycleway", "lane",
+        "surface", "asphalt",
+        "smoothness", "excellent",
+        "segregated", "yes",
+        "_minzoom", 12
+      )),
+      processWith("highway", "cycleway",
+        "cycleway", "lane",
+        "surface", "asphalt",
+        "smoothness", "excellent",
+        "segregated", "yes"
+      )
+    );
+  }
+
+  @Test
+  void testCyclewayInfrastructure() {
+    assertFeatures(15,
+      List.of(Map.of("kind", "major_road",
+        "cycleway_left", "track",
+        "cycleway_right", "lane",
+        "cycleway_left_width", "2.0",
+        "cycleway_right_buffer", "0.5",
+        "bicycle", "yes",
+        "_minzoom", 7
+      )),
+      processWith("highway", "primary",
+        "cycleway:left", "track",
+        "cycleway:right", "lane",
+        "cycleway:left:width", "2.0",
+        "cycleway:right:buffer", "0.5",
+        "bicycle", "yes"
       )
     );
   }

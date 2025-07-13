@@ -61,6 +61,74 @@ class TransitTest extends LayerTest {
   }
 
   @Test
+  void cycleBarrier() {
+    assertFeatures(16,
+      List.of(Map.of(
+        "kind", "barrier", 
+        "barrier_type", "cycle_barrier",
+        "min_zoom", 16,
+        "bicycle", "dismount"
+      )),
+      process(SimpleFeature.create(
+        newPoint(1, 1),
+        new HashMap<>(Map.of(
+          "barrier", "cycle_barrier",
+          "bicycle", "dismount"
+        )),
+        "osm",
+        null,
+        0
+      )));
+  }
+
+  @Test
+  void bollardBarrier() {
+    assertFeatures(16,
+      List.of(Map.of(
+        "kind", "barrier", 
+        "barrier_type", "bollard",
+        "min_zoom", 16,
+        "bicycle", "yes",
+        "access", "no"
+      )),
+      process(SimpleFeature.create(
+        newPoint(1, 1),
+        new HashMap<>(Map.of(
+          "barrier", "bollard",
+          "bicycle", "yes",
+          "access", "no"
+        )),
+        "osm",
+        null,
+        0
+      )));
+  }
+
+  @Test
+  void crossingWithBicycle() {
+    assertFeatures(16,
+      List.of(Map.of(
+        "kind", "crossing", 
+        "min_zoom", 16,
+        "crossing", "traffic_signals",
+        "bicycle", "yes",
+        "crossing_bicycle", "separate"
+      )),
+      process(SimpleFeature.create(
+        newPoint(1, 1),
+        new HashMap<>(Map.of(
+          "highway", "crossing",
+          "crossing", "traffic_signals",
+          "bicycle", "yes",
+          "crossing:bicycle", "separate"
+        )),
+        "osm",
+        null,
+        0
+      )));
+  }
+
+  @Test
   void notACrossing() {
     // Test that non-crossing highway features are ignored
     assertFeatures(15,

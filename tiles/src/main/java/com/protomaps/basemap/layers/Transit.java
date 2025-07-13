@@ -42,6 +42,35 @@ public class Transit implements ForwardingProfile.LayerPostProcessor {
       if (sf.hasTag("tactile_paving")) {
         feature.setAttr("tactile_paving", sf.getString("tactile_paving"));
       }
+      
+      // Add bicycle-specific crossing attributes
+      if (sf.hasTag("bicycle")) {
+        feature.setAttr("bicycle", sf.getString("bicycle"));
+      }
+      if (sf.hasTag("crossing:bicycle")) {
+        feature.setAttr("crossing_bicycle", sf.getString("crossing:bicycle"));
+      }
+    }
+    
+    // Handle bicycle barriers and bollards
+    if (sf.isPoint() && sf.hasTag("barrier", "cycle_barrier", "bollard", "chicane")) {
+      String kind = "barrier";
+      int minZoom = 16;
+      
+      var feature = features.point(LAYER_NAME)
+        .setId(FeatureId.create(sf))
+        .setAttr("kind", kind)
+        .setAttr("barrier_type", sf.getString("barrier"))
+        .setAttr("min_zoom", minZoom)
+        .setMinZoom(minZoom);
+      
+      // Add bicycle access information for barriers
+      if (sf.hasTag("bicycle")) {
+        feature.setAttr("bicycle", sf.getString("bicycle"));
+      }
+      if (sf.hasTag("access")) {
+        feature.setAttr("access", sf.getString("access"));
+      }
     }
   }
 
